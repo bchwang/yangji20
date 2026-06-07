@@ -72,7 +72,8 @@
         .hist-txt { font-size: 13px; font-weight: 600; color: #334155; white-space: pre-wrap; margin-top: 4px; }
         .hist-action-btn { background: none; border: none; font-weight: 700; cursor: pointer; padding: 0 5px; font-size: 12px; }
         
-        .btn-rename { display: none; background: #e2e8f0; color: #475569; padding: 5px 12px; border-radius: 6px; font-size: 12px; margin-left: 10px; font-weight: bold; border: none; cursor: pointer; }
+        .btn-action-small { display: none; background: #e2e8f0; color: #475569; padding: 5px 12px; border-radius: 6px; font-size: 12px; margin-left: 10px; font-weight: bold; border: none; cursor: pointer; }
+        .btn-action-small.danger { background: #fee2e2; color: #ef4444; }
         
         @keyframes spin { to { transform: rotate(360deg); } }
     </style>
@@ -122,7 +123,8 @@
         <div class="modal-header">
             <div style="display: flex; align-items: center; margin-bottom: 20px;">
                 <h3 id="modal-title" style="margin:0;">시설 정보</h3>
-                <button id="rename-btn" class="btn-rename" onclick="renameRoom()">✏️ 이름 변경</button>
+                <button id="rename-btn" class="btn-action-small" onclick="renameRoom()">✏️ 이름 변경</button>
+                <button id="delete-room-btn" class="btn-action-small danger" onclick="deleteRoom()">🗑️ 구역 삭제</button>
             </div>
             <button onclick="closeModal()" style="background:none; border:none; font-size:32px; cursor:pointer; position:absolute; right:30px; top:30px;">&times;</button>
         </div>
@@ -165,7 +167,11 @@
             <h3 style="margin-top:0;">➕ 구역 추가</h3>
         </div>
         <div class="modal-body">
-            <input type="text" id="new-area" class="search-input" placeholder="새 구역 이름 입력 (예: 지하주차장)">
+            <select id="new-area-type" class="search-input" style="margin-bottom: 10px; font-weight: bold; color: #1e3a8a;">
+                <option value="custom">기타 등록 구역에 추가</option>
+                <option value="floor1">1층 및 협력시설에 추가</option>
+            </select>
+            <input type="text" id="new-area" class="search-input" placeholder="새 구역/업체 이름 입력 (예: 지하주차장)">
             <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
                 <button onclick="closeAddModal()" style="padding:10px 20px; background:#e2e8f0;">취소</button>
                 <button onclick="addArea()" style="padding:10px 20px; background:#1e3a8a; color:white;">추가</button>
@@ -248,8 +254,10 @@
         const d = roomState[rm] || { status: '정상', fireHazard: false, leakHazard: false, fireDesc: '', leakDesc: '', history: [] }; 
         document.getElementById('modal-title').innerText = `🚪 [${rm}] 시설 정밀 관리`; 
         
-        const isRenamable = floor1Rooms.includes(rm) || customRooms.includes(rm);
-        document.getElementById('rename-btn').style.display = isRenamable ? 'inline-block' : 'none';
+        // 1층 협력시설과 기타 구역만 이름 변경 및 삭제 버튼 표시
+        const isEditable = floor1Rooms.includes(rm) || customRooms.includes(rm);
+        document.getElementById('rename-btn').style.display = isEditable ? 'inline-block' : 'none';
+        document.getElementById('delete-room-btn').style.display = isEditable ? 'inline-block' : 'none';
 
         document.getElementById('fire-check').checked = d.fireHazard; 
         document.getElementById('fire-desc').value = d.fireDesc || ''; 
@@ -287,6 +295,31 @@
         await docRef.set({ roomState, customRooms, floor1Rooms });
         alert(`성공적으로 '${trimmedName}'(으)로 변경되었습니다!`);
         closeModal();
+    }
+
+    // 새롭게 추가된 구역 통째로 삭제 기능
+    async function deleteRoom() {
+        const pwd = prompt(`'${activeRoom}' 구역과 모든 기록을 삭제하시겠습니까?\n삭제하려면 관리자 비밀번호를 입력하세요:`);
+        if (pwd !== resetPassword) {
+            if (pwd !== null) alert("비밀번호가 일치하지 않습니다. 삭제 권한이 없습니다.");
+            return;
+        }
+
+        if(confirm(`⚠️ 정말로 '${activeRoom}' 구역을 삭제하시겠습니까?\n한번 삭제된 구역과 이력 데이터는 복구할 수 없습니다.`)) {
+            if (floor1Rooms.includes(activeRoom)) {
+                floor1Rooms.splice(floor1Rooms.indexOf(activeRoom), 1);
+            } else if (customRooms.includes(activeRoom)) {
+                customRooms.splice(customRooms.indexOf(activeRoom), 1);
+            }
+
+            if (roomState[activeRoom]) {
+                delete roomState[activeRoom];
+            }
+
+            await docRef.set({ roomState, customRooms, floor1Rooms });
+            alert(`'${activeRoom}' 구역이 완전히 삭제되었습니다.`);
+            closeModal();
+        }
     }
 
     function renderHistory(hist) { 
@@ -361,10 +394,18 @@
     function openAddModal() { document.getElementById('add-modal').style.display = 'flex'; }
     function closeAddModal() { document.getElementById('add-modal').style.display = 'none'; }
     
+    // 구역 추가시 선택한 카테고리에 맞춰 배열에 추가하도록 로직 변경
     async function addArea() { 
         const n = document.getElementById('new-area').value.trim(); 
+        const type = document.getElementById('new-area-type').value; // 어느 구역에 넣을지 확인
         if(!n) return; 
-        customRooms.push(n); 
+        
+        if (type === 'floor1') {
+            floor1Rooms.push(n);
+        } else {
+            customRooms.push(n); 
+        }
+        
         await docRef.set({ roomState, customRooms, floor1Rooms }); 
         closeAddModal(); 
         document.getElementById('new-area').value = ''; 
@@ -387,7 +428,6 @@
     function changeAdminPwd() { const c = prompt("현재 비밀번호 입력:"); if(c === resetPassword) { const n = prompt("새 비밀번호:"); if(n) configRef.set({ resetPassword: n }); } else alert("비밀번호 불일치"); }
     function resetData() { const p = prompt("관리자 비밀번호:"); if(p === resetPassword && confirm("전체 초기화?")) docRef.set({ roomState: {}, customRooms: ["기타1","기타2","기타3","기타4","기타5","기타6","기타7","기타8","기타9","기타10"], floor1Rooms: ["에스와이", "미래개발"] }); }
 
-    // 업그레이드된 엑셀 (XLS 형식 - 노란색 하이라이트 포함) 다운로드 엔진
     function exportDataV2() {
         let tableHTML = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">';
         tableHTML += '<head><meta charset="utf-8"></head>';
@@ -406,7 +446,6 @@
                     let lastHist = d.history && d.history.length > 0 ? d.history[0].description.replace(/\n/g, "<br>") : '';
                     let lastDate = d.history && d.history.length > 0 ? d.history[0].date : '';
                     
-                    // 미조치 사항(접수, 점검) 행을 노란색으로 강조
                     let rowStyle = (status === '접수' || status === '점검') ? 'style="background-color: #FFFF00;"' : '';
 
                     tableHTML += `<tr ${rowStyle}>
@@ -423,7 +462,6 @@
         
         tableHTML += '</table></body></html>';
 
-        // Blob을 사용하여 XLS 형식으로 다운로드
         const blob = new Blob([tableHTML], { type: 'application/vnd.ms-excel' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
