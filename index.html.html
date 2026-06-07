@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>S-Tec Premium Room Management V2.0</title>
+    
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏢</text></svg>">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏢</text></svg>">
+    <meta name="apple-mobile-web-app-title" content="객실관리">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=Poppins:wght@600&display=swap" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    
+    <style>
+        :root { 
+            --stec-navy: #0f172a; --stec-blue: #1e40af; --accent-green: #22c55e; 
+            --accent-red: #ef4444; --accent-gold: #f59e0b; --accent-cyan: #0284c7; 
+            --bg-light: #f8fafc; --card-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); 
+        }
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #f1f5f9; margin: 0; padding: 0; color: #1e293b; line-height: 1.6; }
+        .container { max-width: 1440px; margin: 0 auto; padding: 30px; }
+        
+        .header-bar { background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%); color: white; padding: 25px 40px; border-radius: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2); }
+        .header-title-area { display: flex; align-items: center; gap: 30px; }
+        .logo-box { background: white; padding: 10px 20px; border-radius: 12px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        .logo-box img { max-height: 48px; object-fit: contain; } 
+        .header-text h1 { margin: 0; font-size: 26px; font-weight: 700; display: flex; align-items: center; gap: 15px; }
+        .sync-badge { font-size: 12px; padding: 6px 16px; border-radius: 30px; background: rgba(34, 197, 94, 0.2); color: #4ade80; font-weight: 600; }
+        .header-btn-group { display: flex; gap: 12px; align-items: center; }
+        
+        button { cursor: pointer; border: none; border-radius: 10px; font-weight: 600; transition: all 0.3s; font-family: inherit; font-size: 14px; padding: 12px 20px; }
+        .btn-blue { background: #3b82f6; color: white; }
+        .btn-green { background: #10b981; color: white; }
+        .btn-red { background: rgba(239, 68, 68, 0.1); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+        .btn-settings { background: rgba(255,255,255,0.1); color: white; padding: 12px; border-radius: 50%; font-size: 18px; }
+        
+        .dashboard { display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; margin-bottom: 30px; }
+        .stat-card { background: white; padding: 20px; border-radius: 18px; border: 1px solid #e2e8f0; box-shadow: var(--card-shadow); display: flex; flex-direction: column; }
+        .stat-val { font-size: 28px; font-weight: 800; color: #0f172a; margin-bottom: 5px; }
+        .stat-lbl { font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase; }
+        .stat-list { margin-top: 10px; font-size: 12px; color: #475569; max-height: 50px; overflow-y: auto; background: #f8fafc; padding: 8px; border-radius: 8px; font-weight: 600; }
+
+        .search-area { background: white; padding: 20px; border-radius: 18px; margin-bottom: 30px; border: 1px solid #e2e8f0; box-shadow: var(--card-shadow); }
+        .search-input { width: 100%; padding: 15px 20px; border: 1px solid #e2e8f0; border-radius: 12px; font-size: 15px; box-sizing: border-box; background-color: #f8fafc; }
+        
+        .floor-section { background: white; border-radius: 20px; padding: 25px; margin-bottom: 25px; border: 1px solid #e2e8f0; }
+        .floor-title { font-weight: 700; color: #0f172a; margin-bottom: 20px; font-size: 18px; border-bottom: 2px solid #f1f5f9; padding-bottom: 12px; }
+        .grid-rooms { display: grid; grid-template-columns: repeat(auto-fill, minmax(115px, 1fr)); gap: 10px; }
+        
+        .room-btn { background: white; border: 1px solid #e2e8f0; padding: 15px 5px; border-radius: 10px; font-size: 13px; font-weight: 700; color: #475569; transition: 0.2s; }
+        .room-btn.status-접수 { background: #fff1f2; border-color: #fecdd3; color: #be123c; }
+        .room-btn.status-점검 { background: #fffbeb; border-color: #fef3c7; color: #b45309; }
+        .room-btn.status-완료 { background: #f0fdf4; border-color: #dcfce7; color: #15803d; }
+        .room-btn.fire-hazard { border: 2px dashed #ea580c !important; }
+        .room-btn.leak-hazard { border: 2px dashed var(--accent-cyan) !important; background: #f0f9ff !important; color: #0369a1 !important; }
+
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(4px); justify-content: center; align-items: center; z-index: 1000; padding: 20px; }
+        .modal-content { background: white; width: 100%; max-width: 600px; border-radius: 24px; padding: 30px; max-height: 90vh; overflow-y: auto; }
+        .form-group { background: #f8fafc; padding: 18px; border-radius: 16px; margin-bottom: 15px; border: 1px solid #e2e8f0; }
+        .status-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+        .radio-input { display: none; }
+        .radio-box { display: block; padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px; text-align: center; cursor: pointer; font-size: 13px; font-weight: 600; background: white; }
+        .radio-input:checked + .radio-box { background: #1e3a8a; color: white; border-color: #1e3a8a; }
+
+        .hist-item { background: white; border: 1px solid #e2e8f0; padding: 12px; border-radius: 10px; margin-bottom: 8px; border-left: 4px solid #1e3a8a;}
+        .hist-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+        .hist-time-status { font-size: 12px; color: #1e3a8a; font-weight: 700; }
+        .hist-txt { font-size: 13px; font-weight: 600; color: #334155; white-space: pre-wrap; margin-top: 4px; }
+        .hist-action-btn { background: none; border: none; font-weight: 700; cursor: pointer; padding: 0 5px; font-size: 12px; }
+        
+        .btn-action-small { display: none; background: #e2e8f0; color: #475569; padding: 5px 12px; border-radius: 6px; font-size: 12px; margin-left: 10px; font-weight: bold; border: none; cursor: pointer; }
+        .btn-action-small.danger { background: #fee2e2; color: #ef4444; }
+        
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<div id="loader" style="position: fixed; inset: 0; background: rgba(15, 23, 42, 0.9); z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white;">
+    <div class="spinner" style="width: 50px; height: 50px; border: 5px solid rgba(255,255,255,0.1); border-top-color: #3b82f6; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+    <p>데이터 연동 중...</p>
+</div>
+
+<div class="container">
+    <div class="header-bar">
+        <div class="header-title-area">
+            <div class="logo-box">
+                <img src="image_e5ab80.png.png" alt="S-Tec" onerror="this.parentElement.innerHTML='S-TEC'">
+            </div>
+            <div class="header-text">
+                <h1>객실 시설 관리 V2.0 <span id="sync-status" class="sync-badge">연결중</span></h1>
+            </div>
+        </div>
+        <div class="header-btn-group">
+            <button class="btn-blue" onclick="openAddModal()">➕ 구역 추가</button>
+            <button class="btn-green" onclick="exportDataV2()">📋 엑셀 다운로드</button>
+            <button class="btn-red" onclick="resetData()">⚙️ 포맷</button>
+            <button class="btn-settings" onclick="changeAdminPwd()">🔒</button>
+        </div>
+    </div>
+
+    <div class="dashboard">
+        <div class="stat-card"> <span class="stat-val" id="stat-total">0</span> <span class="stat-lbl">전체 시설</span> </div>
+        <div class="stat-card received"> <span class="stat-val" id="stat-received">0</span> <span class="stat-lbl">🔴 상황 접수</span> <div id="list-received" class="stat-list">없음</div> </div>
+        <div class="stat-card inspecting"> <span class="stat-val" id="stat-inspecting">0</span> <span class="stat-lbl">🟡 점검/진행</span> <div id="list-inspecting" class="stat-list">없음</div> </div>
+        <div class="stat-card fire"> <span class="stat-val" id="stat-fire">0</span> <span class="stat-lbl">🔥 화재안전</span> <div id="list-fire" class="stat-list">없음</div> </div>
+        <div class="stat-card" style="border-left-color: var(--accent-cyan);"> <span class="stat-val" id="stat-leak">0</span> <span class="stat-lbl">💧 누수/배수</span> <div id="list-leak" class="stat-list">없음</div> </div>
+    </div>
+
+    <div class="search-area">
+        <input type="text" id="search" class="search-input" placeholder="호수, 시설명 검색..." oninput="render()">
+    </div>
+
+    <div id="room-grid"></div>
+</div>
+
+<div class="modal-overlay" id="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div style="display: flex; align-items: center; margin-bottom: 20px;">
+                <h3 id="modal-title" style="margin:0;">시설 정보</h3>
+                <button id="rename-btn" class="btn-action-small" onclick="renameRoom()">✏️ 이름 변경</button>
+                <button id="delete-room-btn" class="btn-action-small danger" onclick="deleteRoom()">🗑️ 구역 삭제</button>
+            </div>
+            <button onclick="closeModal()" style="background:none; border:none; font-size:32px; cursor:pointer; position:absolute; right:30px; top:30px;">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group" style="background:#fff7ed; border-color:#fed7aa;">
+                <label style="display:flex; align-items:center; gap:10px; cursor:pointer; color:#c2410c; font-weight:700;">
+                    <input type="checkbox" id="fire-check" onchange="toggleFireDesc()"> 🔥 화재안전점검 결함
+                </label>
+                <div id="fire-desc-box" style="display:none; margin-top:10px;"><input type="text" id="fire-desc" class="search-input" placeholder="결함 사유"></div>
+            </div>
+            <div class="form-group" style="background:#f0f9ff; border-color:#bae6fd;">
+                <label style="display:flex; align-items:center; gap:10px; cursor:pointer; color:#0369a1; font-weight:700;">
+                    <input type="checkbox" id="leak-check" onchange="toggleLeakDesc()"> 💧 누수/배수 결함 발견
+                </label>
+                <div id="leak-desc-box" style="display:none; margin-top:10px;"><input type="text" id="leak-desc" class="search-input" placeholder="누수 위치/상황"></div>
+            </div>
+            
+            <div class="form-group">
+                <span class="form-label" style="display:block; margin-bottom:10px; font-weight:bold;">🛠️ 처리 단계</span>
+                <div class="status-grid">
+                    <input type="radio" name="st" value="정상" id="st1" class="radio-input"><label class="radio-box" for="st1">⚪ 정상</label>
+                    <input type="radio" name="st" value="접수" id="st2" class="radio-input"><label class="radio-box" for="st2">🔴 상황 접수</label>
+                    <input type="radio" name="st" value="점검" id="st3" class="radio-input"><label class="radio-box" for="st3">🟡 점검/진행</label>
+                    <input type="radio" name="st" value="완료" id="st4" class="radio-input"><label class="radio-box" for="st4">🟢 조치 완료</label>
+                </div>
+            </div>
+            <textarea id="repair-txt" rows="3" style="width:100%; box-sizing:border-box; border:1px solid #e2e8f0; border-radius:10px; padding:15px; font-family:inherit;" placeholder="새로운 조치 내용을 입력하세요..."></textarea>
+            <div id="hist-list" style="margin-top:15px;"></div>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+            <button onclick="closeModal()" style="padding:12px 20px; background:#e2e8f0;">취소</button>
+            <button onclick="save()" style="padding:12px 30px; background:#1e3a8a; color:white;">저장</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="add-modal">
+    <div class="modal-content" style="max-width: 400px;">
+        <div class="modal-header">
+            <h3 style="margin-top:0;">➕ 구역 추가</h3>
+        </div>
+        <div class="modal-body">
+            <select id="new-area-type" class="search-input" style="margin-bottom: 10px; font-weight: bold; color: #1e3a8a;">
+                <option value="custom">기타 등록 구역에 추가</option>
+                <option value="floor1">1층 및 협력시설에 추가</option>
+            </select>
+            <input type="text" id="new-area" class="search-input" placeholder="새 구역/업체 이름 입력 (예: 지하주차장)">
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+                <button onclick="closeAddModal()" style="padding:10px 20px; background:#e2e8f0;">취소</button>
+                <button onclick="addArea()" style="padding:10px 20px; background:#1e3a8a; color:white;">추가</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const firebaseConfig = { apiKey: "AIzaSyAl7MKViptnrmWFIm5sqpAAuk_c6Pi5Ej8", authDomain: "condo-sy.firebaseapp.com", projectId: "condo-sy", storageBucket: "condo-sy.firebasestorage.app", messagingSenderId: "352557112590", appId: "1:352557112590:web:ed8ea06a7566f1e83e0b5f", measurementId: "G-63S4HW2SNW" };
+    
+    const initialFloors = { 
+        "10층 (10F)": ["1001M", "1002M", "1003X", "1004S", "1005S", "1006M", "1007M", "1008S", "1009S", "1010S", "1011S", "1012S", "1013S", "1014S", "1015S", "1016S", "1017L1", "1018L1", "1019S", "1020S", "1021S", "1022S", "1023S", "1024S", "1025S", "1026S", "904복층", "905복층", "906복층", "918복층", "919복층", "920복층", "921복층"], 
+        "9층 (9F)": ["901M", "902M", "903X", "904LD", "905MD", "906MD", "907M", "908M", "909S", "910S", "911S", "912S", "913S", "914S", "915S", "916S", "917S", "918MD", "919MD", "920MD", "921MD", "922S", "923S", "924S", "925S", "926S", "927S", "928S", "929S", "805복층", "806복층", "822복층", "823복층", "824복층", "825복층"], 
+        "8층 (8F)": ["801M", "802M", "803X", "804L", "805LD", "806LD", "807M", "808M", "809M", "810M", "811S", "812S", "813S", "814S", "815S", "816S", "817S", "818S", "819S", "820M", "821M", "822MD", "823MD", "824MD", "825MD", "826M", "827M", "828S", "829S", "830S", "831S", "832S", "833S", "834S", "835S"], 
+        "7층 (7F)": ["701M", "702M", "703X", "704L", "705L", "706L", "707M", "708M", "709M", "710M", "711S", "712S", "713S", "714S", "715S", "716S", "717S", "718S", "719S", "720M", "721M", "722M", "723M", "724M", "725M", "726M", "727M", "728S", "729S", "730S", "731S", "732S", "733S", "734S", "735S"], 
+        "6층 (6F)": ["601M", "602M", "603X", "604L", "605L", "606L", "607M", "608M", "609M", "610M", "611S", "612S", "613S", "614S", "615S", "616S", "617S", "618S", "619S", "620M", "621M", "622M", "623M", "624M", "625M", "626M", "627M", "628S", "629S", "630S", "631S", "632S", "633S", "634S", "635S"], 
+        "5층 (5F)": ["501M", "502M", "503X", "504L", "505L", "506L", "507M", "508M", "509M", "510M", "511S", "512S", "513S", "514S", "515S", "516S", "517S", "518S", "519S", "520M", "521M", "522M", "523M", "524M", "525M", "526M", "527M", "528S", "529S", "530S", "531S", "532S", "533S", "534S", "535S"], 
+        "4층 (4F)": ["401M", "402M", "403X", "404L", "405L", "406L", "407M", "408M", "409M", "410M", "411S", "412S", "413S", "414S", "415S", "416S", "417S", "418S", "419S", "420M", "421M", "422M", "423M", "424M", "425M", "426M", "427M", "428S", "429S", "430S", "431S", "432S", "433S", "434S", "435S"], 
+        "3층 (3F)": ["301M", "302M", "303X", "304L", "305L", "306L", "307M", "308M", "309M", "310M", "311S", "312S", "313S", "314S", "315S", "316S", "317S", "318S", "319S", "320M", "321M", "322M", "323M", "324M", "325M", "326M", "327M", "328S", "329S", "330S", "331S", "332S", "333S", "334S", "335S"], 
+        "2층 (2F)": ["201M", "202M", "203X", "204L", "205L", "206L", "207M", "208M", "209M", "210M", "211S", "212S", "213S", "214S", "215S", "216S", "217S", "218M", "219M", "220M", "221M", "222M", "223M", "224M", "225M", "226S", "227S", "228S", "229S", "230S", "231S", "232S", "233S"] 
+    };
+    
+    let roomState = {};
+    let customRooms = ["기타1","기타2","기타3","기타4","기타5","기타6","기타7","기타8","기타9","기타10"];
+    let floor1Rooms = ["에스와이", "미래개발"]; 
+    let activeRoom = null;
+    let resetPassword = "0000";
+    
+    firebase.initializeApp(firebaseConfig); 
+    const db = firebase.firestore(), docRef = db.collection("resort_system").doc("resort_main_data"), configRef = db.collection("resort_system").doc("admin_config");
+    
+    configRef.onSnapshot(snap => { if(snap.exists) resetPassword = snap.data().resetPassword || "0000"; });
+    
+    docRef.onSnapshot(snap => { 
+        document.getElementById('loader').style.display = 'none'; 
+        if(snap.exists) { 
+            const d = snap.data(); 
+            roomState = d.roomState || {}; 
+            customRooms = d.customRooms || customRooms; 
+            floor1Rooms = d.floor1Rooms || floor1Rooms; 
+            render(); 
+        } else render(); 
+    });
+
+    function render() {
+        const query = document.getElementById('search').value.toLowerCase();
+        const container = document.getElementById('room-grid'); container.innerHTML = '';
+        
+        const dataSet = { 
+            ...initialFloors, 
+            "1층 및 협력시설 (1F)": floor1Rooms, 
+            "기타 등록 구역": customRooms 
+        };
+        
+        let t=0, r=0, i=0, f=0, l=0;
+        let lr=[], li=[], lf=[], ll=[];
+        for (let floor in dataSet) {
+            const filtered = [...dataSet[floor]].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true})).filter(rm=>rm.toLowerCase().includes(query));
+            if(filtered.length==0 && query) continue;
+            const sec = document.createElement('div'); sec.className = 'floor-section';
+            sec.innerHTML = `<div class="floor-title">📍 ${floor}</div>`;
+            const grid = document.createElement('div'); grid.className = 'grid-rooms';
+            filtered.forEach(rm => {
+                const s = roomState[rm] || { status: '정상', fireHazard: false, leakHazard: false };
+                t++; if(s.status=='접수') {r++; lr.push(rm);} if(s.status=='점검') {i++; li.push(rm);} if(s.fireHazard) {f++; lf.push(rm);} if(s.leakHazard) {l++; ll.push(rm);}
+                const btn = document.createElement('button');
+                btn.className = `room-btn status-${s.status} ${s.fireHazard?'fire-hazard':''} ${s.leakHazard?'leak-hazard':''}`;
+                btn.innerText = (s.fireHazard?'🔥 ':'') + (s.leakHazard?'💧 ':'') + rm;
+                btn.onclick = () => openModal(rm); grid.appendChild(btn);
+            });
+            sec.appendChild(grid); container.appendChild(sec);
+        }
+        document.getElementById('stat-total').innerText = t; document.getElementById('stat-received').innerText = r; document.getElementById('stat-inspecting').innerText = i; document.getElementById('stat-fire').innerText = f; document.getElementById('stat-leak').innerText = l;
+        document.getElementById('list-received').innerText = lr.join(', ') || '없음'; document.getElementById('list-inspecting').innerText = li.join(', ') || '없음'; document.getElementById('list-fire').innerText = lf.join(', ') || '없음'; document.getElementById('list-leak').innerText = ll.join(', ') || '없음';
+    }
+
+    function openModal(rm) { 
+        activeRoom = rm; 
+        const d = roomState[rm] || { status: '정상', fireHazard: false, leakHazard: false, fireDesc: '', leakDesc: '', history: [] }; 
+        document.getElementById('modal-title').innerText = `🚪 [${rm}] 시설 정밀 관리`; 
+        
+        // 1층 협력시설과 기타 구역만 이름 변경 및 삭제 버튼 표시
+        const isEditable = floor1Rooms.includes(rm) || customRooms.includes(rm);
+        document.getElementById('rename-btn').style.display = isEditable ? 'inline-block' : 'none';
+        document.getElementById('delete-room-btn').style.display = isEditable ? 'inline-block' : 'none';
+
+        document.getElementById('fire-check').checked = d.fireHazard; 
+        document.getElementById('fire-desc').value = d.fireDesc || ''; 
+        document.getElementById('leak-check').checked = d.leakHazard; 
+        document.getElementById('leak-desc').value = d.leakDesc || ''; 
+        toggleFireDesc(); toggleLeakDesc(); 
+        document.querySelector(`input[name="st"][value="${d.status || '정상'}"]`).checked = true; 
+        document.getElementById('repair-txt').value = '';
+        renderHistory(d.history || []); 
+        document.getElementById('modal').style.display = 'flex'; 
+    }
+
+    async function renameRoom() {
+        const newName = prompt(`'${activeRoom}'의 새로운 이름을 입력하세요:\n(이름을 바꿔도 기존 데이터는 모두 유지됩니다.)`);
+        if (!newName || newName.trim() === "" || newName === activeRoom) return;
+        const trimmedName = newName.trim();
+        
+        const pwd = prompt("이름을 변경하려면 관리자 비밀번호를 입력하세요:");
+        if (pwd !== resetPassword) {
+            alert("비밀번호가 일치하지 않습니다. 변경 권한이 없습니다.");
+            return;
+        }
+
+        if (floor1Rooms.includes(activeRoom)) {
+            floor1Rooms[floor1Rooms.indexOf(activeRoom)] = trimmedName;
+        } else if (customRooms.includes(activeRoom)) {
+            customRooms[customRooms.indexOf(activeRoom)] = trimmedName;
+        }
+
+        if (roomState[activeRoom]) {
+            roomState[trimmedName] = roomState[activeRoom];
+            delete roomState[activeRoom];
+        }
+
+        await docRef.set({ roomState, customRooms, floor1Rooms });
+        alert(`성공적으로 '${trimmedName}'(으)로 변경되었습니다!`);
+        closeModal();
+    }
+
+    // 새롭게 추가된 구역 통째로 삭제 기능
+    async function deleteRoom() {
+        const pwd = prompt(`'${activeRoom}' 구역과 모든 기록을 삭제하시겠습니까?\n삭제하려면 관리자 비밀번호를 입력하세요:`);
+        if (pwd !== resetPassword) {
+            if (pwd !== null) alert("비밀번호가 일치하지 않습니다. 삭제 권한이 없습니다.");
+            return;
+        }
+
+        if(confirm(`⚠️ 정말로 '${activeRoom}' 구역을 삭제하시겠습니까?\n한번 삭제된 구역과 이력 데이터는 복구할 수 없습니다.`)) {
+            if (floor1Rooms.includes(activeRoom)) {
+                floor1Rooms.splice(floor1Rooms.indexOf(activeRoom), 1);
+            } else if (customRooms.includes(activeRoom)) {
+                customRooms.splice(customRooms.indexOf(activeRoom), 1);
+            }
+
+            if (roomState[activeRoom]) {
+                delete roomState[activeRoom];
+            }
+
+            await docRef.set({ roomState, customRooms, floor1Rooms });
+            alert(`'${activeRoom}' 구역이 완전히 삭제되었습니다.`);
+            closeModal();
+        }
+    }
+
+    function renderHistory(hist) { 
+        const cont = document.getElementById('hist-list'); 
+        cont.innerHTML = hist.length ? '' : '<div style="color:#94a3b8; text-align:center;">기록 없음</div>'; 
+        hist.forEach((h, i) => {
+            cont.innerHTML += `
+            <div class="hist-item">
+                <div class="hist-top">
+                    <span class="hist-time-status">${h.date} | ${h.status}</span>
+                    <div>
+                        <button class="hist-action-btn" style="color:#3b82f6;" onclick="editHist(${i})">수정</button>
+                        <button class="hist-action-btn" style="color:#ef4444;" onclick="delHist(${i})">삭제</button>
+                    </div>
+                </div>
+                <div class="hist-txt">${h.description}</div>
+            </div>`;
+        });
+    }
+
+    async function save() { 
+        const st = document.querySelector('input[name="st"]:checked').value;
+        const f = document.getElementById('fire-check').checked;
+        const l = document.getElementById('leak-check').checked;
+        const fd = document.getElementById('fire-desc').value.trim();
+        const ld = document.getElementById('leak-desc').value.trim();
+        const txt = document.getElementById('repair-txt').value.trim();
+        const d = roomState[activeRoom] || { history: [] }; 
+        
+        let statusChanged = (d.status !== st);
+        let fireChanged = (d.fireHazard !== f);
+        let leakChanged = (d.leakHazard !== l);
+
+        d.history = d.history || []; 
+        
+        if(txt || statusChanged || fireChanged || leakChanged) {
+            const now = new Date();
+            const dateTimeStr = now.toLocaleDateString('ko-KR') + ' ' + now.toLocaleTimeString('ko-KR', {hour: '2-digit', minute:'2-digit'});
+            
+            let logMsg = txt;
+            if(!txt) {
+                let msgs = [];
+                if(statusChanged) msgs.push(`상태변경: ${st}`);
+                if(fireChanged) msgs.push(f ? `🔥 화재위험 체크` : `🟢 화재위험 해제`);
+                if(leakChanged) msgs.push(l ? `💧 누수위험 체크` : `🟢 누수위험 해제`);
+                logMsg = msgs.join(', ');
+            }
+
+            d.history.unshift({ date: dateTimeStr, status: st, description: logMsg }); 
+        }
+        
+        d.status = st; d.fireHazard = f; d.fireDesc = fd; d.leakHazard = l; d.leakDesc = ld; 
+        roomState[activeRoom] = d; 
+        await docRef.set({ roomState, customRooms, floor1Rooms }); 
+        closeModal(); 
+    }
+
+    async function editHist(i) {
+        const oldDesc = roomState[activeRoom].history[i].description;
+        const newDesc = prompt("조치 내용을 수정하세요:", oldDesc);
+        if (newDesc !== null && newDesc.trim() !== "") {
+            roomState[activeRoom].history[i].description = newDesc.trim();
+            await docRef.set({ roomState, customRooms, floor1Rooms });
+            openModal(activeRoom);
+        }
+    }
+
+    function toggleFireDesc() { document.getElementById('fire-desc-box').style.display = document.getElementById('fire-check').checked ? 'block' : 'none'; }
+    function toggleLeakDesc() { document.getElementById('leak-desc-box').style.display = document.getElementById('leak-check').checked ? 'block' : 'none'; }
+    function closeModal() { document.getElementById('modal').style.display = 'none'; render(); }
+    
+    function openAddModal() { document.getElementById('add-modal').style.display = 'flex'; }
+    function closeAddModal() { document.getElementById('add-modal').style.display = 'none'; }
+    
+    // 구역 추가시 선택한 카테고리에 맞춰 배열에 추가하도록 로직 변경
+    async function addArea() { 
+        const n = document.getElementById('new-area').value.trim(); 
+        const type = document.getElementById('new-area-type').value; // 어느 구역에 넣을지 확인
+        if(!n) return; 
+        
+        if (type === 'floor1') {
+            floor1Rooms.push(n);
+        } else {
+            customRooms.push(n); 
+        }
+        
+        await docRef.set({ roomState, customRooms, floor1Rooms }); 
+        closeAddModal(); 
+        document.getElementById('new-area').value = ''; 
+        render(); 
+    }
+    
+    async function delHist(i) { 
+        const pwd = prompt("기록을 삭제하려면 관리자 비밀번호를 입력하세요:");
+        if (pwd === resetPassword) {
+            if(confirm("이 기록을 완전히 삭제하시겠습니까?")) { 
+                roomState[activeRoom].history.splice(i, 1); 
+                await docRef.set({ roomState, customRooms, floor1Rooms }); 
+                openModal(activeRoom); 
+            }
+        } else if (pwd !== null) {
+            alert("비밀번호가 일치하지 않습니다. 삭제 권한이 없습니다.");
+        }
+    }
+
+    function changeAdminPwd() { const c = prompt("현재 비밀번호 입력:"); if(c === resetPassword) { const n = prompt("새 비밀번호:"); if(n) configRef.set({ resetPassword: n }); } else alert("비밀번호 불일치"); }
+    function resetData() { const p = prompt("관리자 비밀번호:"); if(p === resetPassword && confirm("전체 초기화?")) docRef.set({ roomState: {}, customRooms: ["기타1","기타2","기타3","기타4","기타5","기타6","기타7","기타8","기타9","기타10"], floor1Rooms: ["에스와이", "미래개발"] }); }
+
+    function exportDataV2() {
+        let tableHTML = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">';
+        tableHTML += '<head><meta charset="utf-8"></head>';
+        tableHTML += '<body><table border="1">';
+        tableHTML += '<tr style="background-color: #f1f5f9; font-weight: bold; text-align: center;"><th>호수/구역명</th><th>현재상태</th><th>화재위험 여부</th><th>누수위험 여부</th><th>최근 조치내용</th><th>업데이트 일시</th></tr>';
+
+        const allRooms = { ...initialFloors, "1층 및 협력시설 (1F)": floor1Rooms, "기타 등록 구역": customRooms };
+        
+        for (let floor in allRooms) {
+            allRooms[floor].forEach(rm => {
+                const d = roomState[rm];
+                if (d && (d.status !== '정상' || d.fireHazard || d.leakHazard || (d.history && d.history.length > 0))) {
+                    let status = d.status || '정상';
+                    let fire = d.fireHazard ? (d.fireDesc ? `O (${d.fireDesc})` : 'O') : 'X';
+                    let leak = d.leakHazard ? (d.leakDesc ? `O (${d.leakDesc})` : 'O') : 'X';
+                    let lastHist = d.history && d.history.length > 0 ? d.history[0].description.replace(/\n/g, "<br>") : '';
+                    let lastDate = d.history && d.history.length > 0 ? d.history[0].date : '';
+                    
+                    let rowStyle = (status === '접수' || status === '점검') ? 'style="background-color: #FFFF00;"' : '';
+
+                    tableHTML += `<tr ${rowStyle}>
+                        <td style="text-align: center;">${rm}</td>
+                        <td style="text-align: center; font-weight: bold;">${status}</td>
+                        <td style="text-align: center;">${fire}</td>
+                        <td style="text-align: center;">${leak}</td>
+                        <td>${lastHist}</td>
+                        <td style="text-align: center;">${lastDate}</td>
+                    </tr>`;
+                }
+            });
+        }
+        
+        tableHTML += '</table></body></html>';
+
+        const blob = new Blob([tableHTML], { type: 'application/vnd.ms-excel' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `양지파인리조트_객실관리대장_${new Date().toISOString().slice(0,10)}.xls`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    }
+</script>
+</body>
+</html>
